@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lazy Dev Log</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #FAFAF8;
+      --surface: #F1EFE8;
+      --border: rgba(0,0,0,0.1);
+      --text-primary: #1a1a18;
+      --text-secondary: #5F5E5A;
+      --accent: #BA7517;
+      --accent-hover: #854F0B;
+      --code-bg: #EEECEA;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1C1C1A;
+        --surface: #2C2C2A;
+        --border: rgba(255,255,255,0.1);
+        --text-primary: #EEECEA;
+        --text-secondary: #888780;
+        --accent: #EF9F27;
+        --accent-hover: #FAC775;
+        --code-bg: #2C2C2A;
+      }
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text-primary);
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 3rem 1.25rem;
+    }
+
+    .container {
+      max-width: 660px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    header {
+      margin-bottom: 2.5rem;
+      padding-bottom: 1.25rem;
+      border-bottom: 0.5px solid var(--border);
+    }
+
+    header h1 {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 64px;
+      font-weight: 500;
+      letter-spacing: -2px;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+      text-align: center;
+    }
+
+    header p {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: var(--text-secondary);
+      text-align: center;
+    }
+
+    /* Blog entries */
+    article {
+      padding: 1.5rem 0;
+      border-bottom: 0.5px solid var(--border);
+    }
+
+    .entry-date {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--accent);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .entry-date::before {
+      content: '>_';
+      opacity: 0.55;
+    }
+
+    .entry-title {
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+      line-height: 1.35;
+    }
+
+    .entry-tags {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 3px;
+      background: var(--surface);
+      color: var(--text-secondary);
+      border: 0.5px solid var(--border);
+    }
+
+    .entry-preview {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 10px;
+    }
+
+    .entry-body {
+      font-size: 14px;
+      color: var(--text-secondary);
+      display: none;
+      margin-bottom: 12px;
+    }
+
+    .entry-body.open {
+      display: block;
+    }
+
+    .entry-body p {
+      margin-bottom: 0.9rem;
+    }
+
+    .entry-body p:last-child {
+      margin-bottom: 0;
+    }
+
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12.5px;
+      background: var(--code-bg);
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+
+    /* Read more button */
+    .read-more-btn {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      color: var(--accent);
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .read-more-btn:hover {
+      color: var(--accent-hover);
+    }
+
+    .read-more-btn .arrow {
+      transition: transform 0.2s ease;
+      display: inline-block;
+      font-size: 10px;
+    }
+
+    .read-more-btn.open .arrow {
+      transform: rotate(90deg);
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 3rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <header>
+      <h1>lazy dev log</h1>
+      <p>// slow but steady</p>
+    </header>
+
+    <main>
+
+      <article>
+        <p class="entry-date">06/09/2026</p>
+        <h2 class="entry-title">title3</h2>
+        <div class="entry-tags">
+          <span class="tag">example tag</span>
+        </div>
+        <p class="entry-preview">Most of my old comments explain what the code does. Turns out "why" is the only comment that ever helped me six months later.</p>
+        <div class="entry-body" id="body-3">
+          <p>Claude: Here's your <code>index.html</code> — ready to drop into a GitHub repo.</p>
+          <p>A few design choices I made for the "lazy dev" vibe: Terminal prompt dates — every date is prefixed with <code>&gt;_</code> in amber monospace, like a shell prompt. The whole site leans into that without going full hacker-dark. JetBrains Mono for headers and UI chrome, Inter for body — readable but with personality. Dark mode built in — automatically respects the OS setting via <code>prefers-color-scheme</code>.</p>
+          <p>To get it on GitHub, just create a new repo, drop <code>index.html</code> in the root, and enable GitHub Pages (Settings → Pages → Deploy from branch → main / root). Your blog will be live at <code>https://yourusername.github.io/your-repo-name</code> with no build step needed.</p>
+          <p>You said: Looks great, keep the style and format, make the following changes. Change the dates to be 06/07/2026, 06/08/2026, and 06/09/2026. Change the titles to be title1, title2, and title3. Change the tags to be just one 'example tag'.</p>
+          <p>Claude: Done! All three entries updated — dates to MM/DD/YYYY format, titles to title1/title2/title3, and tags reduced to a single "example tag" each. Everything else stays exactly as it was.</p>
+          <p>You said: Change the title to be centered, and much larger. Change the subtitle to be 'slow but steady'. Change the order of the posts to be from newest to oldest. Change the description of title3 to be a paste of this text exchange.</p>
+          <p>Claude: A few quick questions before I make the changes — the text exchange you'd like to paste as the description for title3 didn't come through. Could you paste it?</p>
+          <p>You said: This is the text. [pasted exchange]. Yes.</p>
+          <p>Claude: Done!</p>
+        </div>
+        <button class="read-more-btn" onclick="toggle('body-3', this)" aria-expanded="false">
+          <span class="arrow">▶</span> read more
+        </button>
+      </article>
+
+      <article>
+        <p class="entry-date">06/08/2026</p>
+        <h2 class="entry-title">title2</h2>
+        <div class="entry-tags">
+          <span class="tag">example tag</span>
+        </div>
+        <p class="entry-preview">Spun up a new machine this week. Spent the first two hours fighting Docker Desktop memory settings. Some things never change.</p>
+        <div class="entry-body" id="body-2">
+          <p>New M-series MacBook, fresh install. The hardware is genuinely great — fast, cool, quiet. But Docker Desktop still defaults to 2GB RAM on first install, which means your Postgres container gets OOM-killed the moment you run a migration with any real dataset.</p>
+          <p>I've started keeping a <code>setup.md</code> in every project root with the "gotchas" list. Not docs — just a personal reminder of the three things that always bite me. It's embarrassing how often I refer to it.</p>
+        </div>
+        <button class="read-more-btn" onclick="toggle('body-2', this)" aria-expanded="false">
+          <span class="arrow">▶</span> read more
+        </button>
+      </article>
+
+      <article>
+        <p class="entry-date">06/07/2026</p>
+        <h2 class="entry-title">title1</h2>
+        <div class="entry-tags">
+          <span class="tag">example tag</span>
+        </div>
+        <p class="entry-preview">After three projects in a row where the ORM "magic" turned into debugging sessions, I gave raw SQL another chance. Spoiler: it was fine.</p>
+        <div class="entry-body" id="body-1">
+          <p>I know, I know — this is a takes-that-never-die. But bear with me. My last three projects used Prisma, SQLAlchemy, and Sequelize respectively. Each one hit a point where I was reading the ORM source code to understand why my join wasn't doing what I expected. At that point, I'm already writing SQL in my head — so why not just… write SQL?</p>
+          <p>The switch was mostly painless. I use a thin query builder for parameterization and call it a day. My migration files are actual SQL files. My queries are readable to anyone who knows SQL, which is everyone.</p>
+          <p>There are legitimate reasons to use ORMs — teams unfamiliar with SQL, fast prototyping, auto-generated CRUD. But for anything past the happy path, I'm skeptical.</p>
+        </div>
+        <button class="read-more-btn" onclick="toggle('body-1', this)" aria-expanded="false">
+          <span class="arrow">▶</span> read more
+        </button>
+      </article>
+
+    </main>
+
+    <footer>
+      <p>// end of log</p>
+    </footer>
+
+  </div>
+
+  <script>
+    function toggle(bodyId, btn) {
+      const body = document.getElementById(bodyId);
+      const isOpen = body.classList.contains('open');
+      body.classList.toggle('open');
+      btn.classList.toggle('open');
+      btn.setAttribute('aria-expanded', String(!isOpen));
+      btn.innerHTML = isOpen
+        ? '<span class="arrow">▶</span> read more'
+        : '<span class="arrow" style="transform:rotate(90deg);display:inline-block">▶</span> collapse';
+    }
+  </script>
+</body>
+</html>
