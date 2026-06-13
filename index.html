@@ -199,6 +199,565 @@
     <main>
 
       <article>
+        <p class="entry-date">06/13/2026</p>
+        <h2 class="entry-title">Trading Strategy Development 1</h2>
+        <div class="entry-tags">
+          <span class="tag">Trading</span>
+        </div>
+        <p class="entry-preview">Spun up a new machine this week. Spent the first two hours fighting Docker Desktop memory settings. Some things never change.</p>
+        <div class="entry-body" id="body-2">
+          <p># ML Trading Strategy: Development Process
+### Target: >16% Annual ROI | Multi-Layer Architecture
+
+---
+
+## Architecture Overview
+
+```
+RAW MARKET DATA
+      │
+      ▼
+┌─────────────────────┐
+│  LAYER 1            │  ← Feature Engineering + Variable Assessment
+│  1-Week Forecaster  │     (LSTM / Transformer / XGBoost Ensemble)
+│  (Price + Direction)│
+└────────┬────────────┘
+         │  forecast signal + confidence score
+         ▼
+┌─────────────────────┐
+│  LAYER 2            │  ← Entry/Exit sizing, stop-loss, position mgmt
+│  Trade Optimizer    │     (Multi-objective optimization + Risk models)
+│  (Signal → Orders)  │
+└────────┬────────────┘
+         │  candidate trade actions
+         ▼
+┌─────────────────────┐
+│  LAYER 3            │  ← Learns from live/simulated P&L feedback
+│  RL Agent           │     (PPO / SAC acting on portfolio state)
+│  (Balance Maximizer)│
+└────────┬────────────┘
+         │
+         ▼
+    LIVE EXECUTION
+```
+
+---
+
+## CRITIQUE OF THE METHODOLOGY
+
+Before the step-by-step process, here is an honest assessment of the risks and failure modes in this architecture, along with recommended mitigations.
+
+| Risk | Severity | Mitigation |
+|---|---|---|
+| **Overfitting across all 3 layers** | Critical | Walk-forward validation; never test on data used in any layer's training |
+| **Data leakage between layers** | Critical | Strict temporal split; Layer 2 must never see Layer 3's reward signal during training |
+| **RL instability on live capital** | High | Paper trade RL for ≥3 months before deployment; use conservative action clipping |
+| **16% target encouraging leverage abuse** | High | Cap leverage; enforce max drawdown kill switch at −10% monthly |
+| **Forecast horizon mismatch** | Medium | 1-week forecast must align with the RL agent's reward horizon and the optimizer's holding period |
+| **Transaction cost blindness** | Medium | Embed slippage + commission in every backtest and RL reward function |
+| **Regime blindness** | Medium | Include a regime detector (HMM or volatility clustering) upstream of all three layers |
+| **Survivorship bias in features** | Medium | Use point-in-time data; avoid using index constituents retroactively |
+
+**Architectural Optimizations Applied Below:**
+- A **Regime Detector** is added upstream of Layer 1 to context-gate all predictions
+- Layer 2 is split into **signal filtering** and **position sizing** sub-modules
+- The RL agent's state space is expanded to include Layer 1 confidence and Layer 2 sizing signals
+- A **circuit breaker** module sits between Layer 3 and execution
+
+---
+
+## STEP 1: Project Setup & Data Infrastructure
+
+**Requirement:** Reliable, clean, point-in-time market data pipeline.
+
+**Performance Expectation:** Zero lookahead bias; data latency <1 minute for live feed.
+
+**Desired Output:**
+- Normalized OHLCV database (daily + intraday)
+- Corporate actions adjusted prices
+- Macro/alternative data feeds ingested
+- Train / validation / test split locked before any modeling begins
+
+**Assets to Consider:**
+- Equities (large cap for liquidity)
+- ETFs (sector rotation signals)
+- Futures (macro regime signals)
+- Options flow data (sentiment proxy)
+
+**Data Split Protocol:**
+```
+├── Training Set:     2010–2019  (in-sample)
+├── Validation Set:   2020–2022  (hyperparameter tuning only)
+└── Test Set:         2023–present  (NEVER touched until final eval)
+```
+
+**Template Prompt:**
+```
+You are a quantitative data engineer. Design a Python data pipeline that:
+1. Pulls daily OHLCV data for [TICKER LIST] from [DATA SOURCE] from 2010 to present
+2. Adjusts for splits and dividends using point-in-time adjustment factors
+3. Flags and handles missing data without forward-filling gaps > 3 days
+4. Outputs a normalized Parquet dataset with a strict no-lookahead guarantee
+5. Appends macro features: VIX, yield curve spread (10Y-2Y), DXY, SPY 20-day realized vol
+Include unit tests that verify no future data appears in any row's feature set.
+```
+
+---
+
+## STEP 2: Variable Assessment & Feature Engineering
+
+**Requirement:** Identify predictive features with statistical rigor; eliminate noise.
+
+**Performance Expectation:** Selected features show IR (Information Ratio) > 0.05 on validation set individually; ensemble IC > 0.08.
+
+**Desired Output:**
+- Feature importance ranking
+- Correlation matrix (drop features with |corr| > 0.85 to another)
+- Mutual information scores vs. 1-week forward return
+- Final feature set of 30–80 variables
+
+**Feature Categories:**
+
+```
+TECHNICAL                   FUNDAMENTAL              ALTERNATIVE
+─────────────────           ──────────────           ─────────────────
+Price momentum (1d-60d)     P/E, P/B, EV/EBITDA     Options put/call ratio
+RSI, MACD, Bollinger        Earnings revision        Short interest %
+Volume profile              Revenue growth           Insider buy/sell
+Realized volatility         Margin trends            News sentiment score
+Mean reversion z-score      Sector relative value    Google Trends proxy
+
+MACRO / REGIME
+───────────────────────────────────────────────
+VIX term structure (spot vs. 3m)
+Yield curve slope + curvature
+Credit spread (HY-IG)
+Cross-asset momentum (equities vs. bonds vs. commodities)
+Hidden Markov Model regime label (bull / bear / chop)
+```
+
+**Variable Assessment Process:**
+1. Compute IC (Information Coefficient) for each raw feature vs. 1W forward return
+2. Run SHAP analysis on a baseline XGBoost to rank feature contributions
+3. Apply Boruta (or recursive feature elimination) to eliminate noise variables
+4. Check for regime-conditional predictiveness — some features only work in trending markets
+5. Final set validated on a holdout year before entering model training
+
+**Template Prompt:**
+```
+You are a quant researcher. Given a DataFrame `df` with columns for OHLCV data
+and the macro features [LIST], perform the following:
+1. Compute the 1-week (5-day) forward log return as the target variable
+2. For each candidate feature, compute rolling 63-day Information Coefficient (Spearman rank correlation with forward return)
+3. Compute mutual information scores using sklearn's mutual_info_regression
+4. Generate a correlation heatmap and flag feature pairs with |corr| > 0.85
+5. Train a LightGBM model and extract SHAP values for global feature importance
+6. Return a ranked feature importance table and a recommended final feature set
+Avoid any lookahead in feature construction. Use only data available at time T to predict return at T+5.
+```
+
+---
+
+## STEP 3: Regime Detection (Upstream Gate)
+
+**Requirement:** Classify current market regime to context-gate Layer 1 predictions.
+
+**Performance Expectation:** Regime transitions detected within 2–5 days of structural shift; ≥70% regime classification accuracy on held-out data.
+
+**Desired Output:**
+- Continuous regime probability vector: P(bull), P(bear), P(chop/range)
+- Discrete regime label fed as a feature to all downstream layers
+- Regime-conditional return distribution stats
+
+**Model Options:**
+- Hidden Markov Model (HMM) — interpretable, well-studied for financial regimes
+- Gaussian Mixture Model on volatility + momentum features
+- Ensemble: HMM + volatility clustering (GARCH) + VIX level threshold
+
+**Template Prompt:**
+```
+You are a quantitative strategist. Build a Hidden Markov Model regime classifier:
+1. Features: 20-day realized vol, 60-day SPY momentum, VIX level, yield curve slope
+2. Fit a 3-state Gaussian HMM (bull / bear / high-vol chop) using hmmlearn
+3. Use Viterbi decoding to assign regime labels to historical data
+4. Validate by checking that average returns differ significantly across regimes (run ANOVA)
+5. Output a daily regime probability vector P(bull_t), P(bear_t), P(chop_t)
+6. Show regime-conditional Sharpe ratios and max drawdowns for the SPY baseline
+The model must be retrained on a rolling 3-year window; never use future data.
+```
+
+---
+
+## STEP 4: Layer 1 — 1-Week Forecasting Model
+
+**Requirement:** Predict 5-day forward price direction (or return magnitude) with statistically significant edge.
+
+**Performance Expectation:**
+- Directional accuracy > 54% on test set (random = 50%)
+- IC (Information Coefficient) > 0.06 on test set
+- Sharpe of raw signal (long only on positive forecast) > 0.8
+
+**Desired Output:**
+- Point forecast: expected 5-day log return
+- Confidence score: model uncertainty (via Monte Carlo Dropout or conformal prediction)
+- Per-asset signal: scaled from −1 (strong short) to +1 (strong long)
+
+**Model Architecture — Ensemble of 3:**
+
+```
+INPUT FEATURES (from Step 2 + regime label)
+        │
+   ┌────┴────────────────┐
+   │                     │                   │
+   ▼                     ▼                   ▼
+LSTM/GRU           LightGBM/XGBoost    Temporal Fusion
+(sequence)         (tabular)           Transformer (TFT)
+   │                     │                   │
+   └─────────────────────┘───────────────────┘
+                         │
+                  Stacking Ensemble
+               (Ridge regression meta-learner)
+                         │
+                  FORECAST OUTPUT
+           (return estimate + confidence)
+```
+
+**Training Protocol:**
+- Walk-forward cross-validation: 12 rolling folds, each expanding 6 months
+- Loss function: MSE on return + directional accuracy penalty
+- Regime-conditional weighting: upweight training samples from current regime
+
+**Template Prompt:**
+```
+You are an ML engineer building a 1-week equity return forecaster.
+Architecture requirements:
+1. Build three base models:
+   a. A 2-layer LSTM (hidden=128) taking a 60-day rolling window of features as input
+   b. A LightGBM model on the same features in tabular form (point-in-time)
+   c. A Temporal Fusion Transformer using pytorch-forecasting
+2. Train all three using walk-forward validation (12 folds, expanding window)
+3. Ensemble with a Ridge regression meta-learner trained on out-of-fold predictions
+4. Output: for each asset on each day, a predicted 5-day return and an uncertainty score (MC Dropout for LSTM, quantile regression for LGBM and TFT)
+5. Compute IC, hit rate, and long-only signal Sharpe on the held-out 2023–present test set
+6. Include regime-conditional performance breakdown (bull/bear/chop)
+Reject the model if test-set IC < 0.05 or hit rate < 53%.
+```
+
+---
+
+## STEP 5: Layer 2 — Trade Optimizer
+
+**Requirement:** Convert raw forecasts into executable, risk-managed orders with optimal position sizing.
+
+**Performance Expectation:**
+- Simulated portfolio Sharpe ≥ 1.2 on validation data
+- Max drawdown ≤ 15% in any backtest period
+- Annual turnover < 400% (to keep transaction costs manageable)
+
+**Desired Output:**
+- Per-asset position weight: w_i ∈ [−1, 1] (as fraction of portfolio)
+- Stop-loss level per position
+- Expected portfolio-level risk (volatility, VaR)
+- Rebalance signal: when to act vs. when to hold
+
+**Sub-Module A — Signal Filter:**
+```
+Inputs:  Layer 1 forecast + confidence score + regime label
+Process:
+  - Only pass signals with confidence > threshold (calibrated on validation)
+  - Apply regime gate: suppress long signals in bear regime, short signals in bull
+  - Apply minimum IC threshold: discard forecasts for assets with recent IC < 0.03
+Output:  Filtered signal set (reduced universe)
+```
+
+**Sub-Module B — Position Sizer:**
+```
+Inputs:  Filtered signals + asset volatility + correlation matrix
+Process:
+  - Kelly Criterion sizing: f* = (μ/σ²) * scale_factor (use half-Kelly for safety)
+  - Mean-Variance Optimization (MVO) with constraints:
+      - Max single position: 15% of portfolio
+      - Max sector concentration: 30%
+      - Target portfolio vol: 12–15% annualized
+  - Risk parity blending: blend Kelly weights with risk parity to reduce concentration
+Output:  Position weights w_i
+```
+
+**Template Prompt:**
+```
+You are a portfolio construction engineer. Build a trade optimizer that takes:
+  - `signals`: DataFrame of per-asset predicted 5-day returns and confidence scores
+  - `cov_matrix`: Rolling 60-day covariance matrix of asset returns
+  - `regime`: current market regime label
+
+Steps:
+1. Filter: drop signals where confidence < 0.55 or regime contradicts direction
+2. Compute Kelly fraction for each asset: f_i = signal_i / variance_i, then scale by 0.5 (half-Kelly)
+3. Run Mean-Variance Optimization using cvxpy to maximize Sharpe subject to:
+   - Sum of |w_i| ≤ 1.5 (150% gross exposure max)
+   - Max |w_i| ≤ 0.15 per asset
+   - Portfolio target volatility ≤ 0.15 annualized
+4. Blend MVO weights 60% with equal-risk-contribution weights 40%
+5. Set stop-loss for each position at 1.5x the asset's 10-day ATR below entry
+6. Output final weight vector, expected portfolio vol, and Sharpe estimate
+Backtest this optimizer on 2020–2022 validation data using realistic bid-ask spread estimates.
+```
+
+---
+
+## STEP 6: Layer 3 — Reinforcement Learning Agent
+
+**Requirement:** Learn a sequential decision policy that maximizes risk-adjusted portfolio growth over time.
+
+**Performance Expectation:**
+- RL agent outperforms Layer 2 baseline by ≥2% annual return on validation set
+- Drawdown no worse than Layer 2 baseline
+- Policy converges stably within 500k environment steps (no divergence)
+
+**Desired Output:**
+- Trained policy π(action | state) mapping portfolio state → position adjustments
+- Action confidence score (used by circuit breaker)
+- Running balance trajectory vs. benchmark
+
+**State Space:**
+```python
+state = {
+    "layer1_forecasts":     np.array,   # per-asset return predictions
+    "layer1_confidence":    np.array,   # uncertainty scores
+    "layer2_weights":       np.array,   # suggested position sizes
+    "current_positions":    np.array,   # actual current holdings
+    "portfolio_pnl_5d":     float,      # recent P&L as context
+    "regime_probs":         np.array,   # [P(bull), P(bear), P(chop)]
+    "days_in_trade":        np.array,   # time since each position opened
+    "portfolio_vol_10d":    float,      # realized vol of portfolio
+}
+```
+
+**Action Space:**
+```
+Continuous: adjustment vector Δw_i ∈ [−0.05, +0.05] per asset per step
+(small incremental adjustments to existing Layer 2 weights)
+```
+
+**Reward Function:**
+```python
+reward = (
+    portfolio_log_return
+    - 0.5 * portfolio_volatility_penalty   # Sharpe-style risk adjustment
+    - transaction_cost                      # realistic slippage + commissions
+    - drawdown_penalty                      # extra penalty if drawdown > 8%
+)
+```
+
+**Algorithm:** Proximal Policy Optimization (PPO) or Soft Actor-Critic (SAC)
+- SAC preferred for continuous action spaces (more sample efficient)
+- Train on simulated environment wrapping historical data (gym-style)
+
+**Template Prompt:**
+```
+You are an RL engineer building a portfolio management agent using Stable-Baselines3.
+Environment spec:
+  - State: [layer1_forecasts, layer1_confidence, layer2_weights, current_positions,
+            5d_pnl, regime_probs, portfolio_vol] — flatten to a 1D vector
+  - Action: continuous vector of position weight adjustments per asset, clipped to [-0.05, 0.05]
+  - Reward: daily risk-adjusted return minus transaction costs and drawdown penalty
+  - Episode length: 252 steps (1 trading year), reset at episode end
+
+Tasks:
+1. Implement the gym.Env class with step(), reset(), and render()
+2. Embed Layer 1 and Layer 2 outputs as frozen components of the observation
+3. Train a SAC agent for 1M steps using historical data from 2010–2019
+4. Evaluate on 2020–2022 validation episodes; report mean episode return and Sharpe
+5. Compare agent performance vs. Layer 2 optimizer baseline (no RL)
+6. Implement a circuit breaker: if the agent proposes a position change >3x Layer 2's suggestion, flag for human review instead of auto-executing
+Do not allow the RL agent to access future data in the environment step function.
+```
+
+---
+
+## STEP 7: Model Analysis & Performance Validation
+
+**Requirement:** Rigorous, unbiased evaluation before any capital is risked.
+
+**Performance Expectation:**
+- Full-stack system Sharpe ≥ 1.3 on untouched 2023–present test set
+- Annualized return ≥ 16% net of estimated transaction costs
+- Maximum drawdown ≤ 18%
+- Win rate ≥ 52% on completed trades
+
+**Analysis Checklist:**
+
+```
+BACKTEST INTEGRITY
+  ☐ Zero lookahead bias confirmed (audit each feature lag)
+  ☐ Point-in-time data verified (no survivorship bias)
+  ☐ Transaction costs modeled: 0.05% per side + market impact for size
+  ☐ Walk-forward results consistent (no single lucky fold driving performance)
+
+STATISTICAL SIGNIFICANCE
+  ☐ t-test on daily alpha: p < 0.05
+  ☐ Bootstrap 95% CI on Sharpe includes 1.0 at lower bound
+  ☐ Permutation test: strategy beats 95% of randomly permuted signal strategies
+  ☐ Out-of-sample IC positive in ≥ 8 of 12 walk-forward folds
+
+REGIME & STRESS TESTING
+  ☐ Performance in COVID crash (Feb–Mar 2020): drawdown < 20%
+  ☐ Performance in 2022 rate-hike bear market: positive alpha vs. SPY
+  ☐ Performance in 2017–2019 low-vol bull: Sharpe > 1.0
+
+RISK DECOMPOSITION
+  ☐ Benchmark beta < 0.6 (strategy not just leveraged market exposure)
+  ☐ Factor exposure audit: not just riding momentum or size factor blindly
+  ☐ Idiosyncratic return (alpha) > 10% of total return
+```
+
+**Template Prompt:**
+```
+You are a quant risk analyst. Evaluate the full 3-layer trading system on the test set (2023–present):
+1. Run a full backtest with: initial capital $100,000, daily rebalancing, 0.05% transaction cost per side
+2. Compute: annualized return, Sharpe ratio, Sortino ratio, max drawdown, win rate, avg hold period
+3. Run a regime-conditional performance table (bull/bear/chop separately)
+4. Run a 1000-sample bootstrap on the daily return series to get 95% CI on Sharpe
+5. Run a permutation test: shuffle the signal dates 1000x and report the percentile of the true strategy Sharpe
+6. Decompose returns using Fama-French 5-factor model; report alpha (annualized) and factor loadings
+7. Stress test: replay performance during [2020 COVID crash, 2022 bear market, 2015 China crash]
+8. Flag any period where monthly drawdown exceeded 8% — investigate if caused by model failure or regime gap
+Output a final scorecard and a go/no-go recommendation for paper trading.
+```
+
+---
+
+## STEP 8: Implementation & Deployment
+
+**Requirement:** Production-grade execution with monitoring, failsafes, and live performance tracking.
+
+**Performance Expectation:**
+- Order latency < 500ms for signal-to-order
+- System uptime > 99.5% during market hours
+- Live Sharpe tracked weekly; auto-pause if rolling 90-day Sharpe < 0.5
+
+**Desired Output:**
+- Deployed trading bot with live data feed integration
+- Real-time dashboard: P&L, positions, drawdown, signal heatmap
+- Alert system: drawdown breach, model confidence collapse, unusual position sizes
+
+**Deployment Architecture:**
+```
+LIVE DATA FEED (broker API / market data vendor)
+          │
+    Feature Pipeline
+    (same transforms as training)
+          │
+    Regime Detector (retrained monthly)
+          │
+    Layer 1 Forecaster (retrained quarterly)
+          │
+    Layer 2 Optimizer (reoptimized weekly)
+          │
+    RL Agent (fine-tuned monthly on live data)
+          │
+    Circuit Breaker
+    (blocks trades if: confidence < threshold,
+     position > 3x normal, drawdown > 10% MTD)
+          │
+    Order Management System
+          │
+    Broker Execution API
+```
+
+**Retraining Schedule:**
+| Component | Retraining Frequency | Trigger for Ad-Hoc Retrain |
+|---|---|---|
+| Regime Detector | Monthly | IC drops below 0.04 |
+| Layer 1 Forecaster | Quarterly | Hit rate drops below 51% |
+| Layer 2 Optimizer | Weekly (parameters only) | Sharpe decay > 20% |
+| RL Agent | Monthly fine-tune | Reward consistently negative |
+
+**Template Prompt:**
+```
+You are a systems engineer deploying an algorithmic trading system. Build a production pipeline that:
+1. Connects to [BROKER API] for live data and order execution
+2. Runs the feature pipeline in real-time, computing all features as of market close each day
+3. Passes features through the frozen Layer 1, Layer 2, and RL agent models
+4. Applies the circuit breaker: block any order where:
+   - Proposed position > 15% of portfolio
+   - MTD drawdown > 10%
+   - Model confidence < 0.50
+   - Layer 1 IC (rolling 20d) < 0.03
+5. Logs every decision: feature values, model outputs, circuit breaker status, order sent/blocked
+6. Sends a daily P&L email summary and a weekly performance dashboard
+7. Triggers a Slack alert if: daily loss > 2%, drawdown > 7%, or any model output is NaN/inf
+Include retry logic for API failures and a manual override kill switch.
+```
+
+---
+
+## STEP 9: Ongoing Monitoring & Strategy Evolution
+
+**Requirement:** Continuous performance tracking and systematic improvement loop.
+
+**Desired Output:**
+- Weekly model health report
+- Monthly strategy review meeting checklist
+- Quarterly full model re-evaluation
+
+**Monitoring KPIs:**
+```
+DAILY:    P&L, positions, drawdown, circuit breaker triggers
+WEEKLY:   Rolling Sharpe (30d), signal IC, Layer 1 hit rate
+MONTHLY:  Regime-conditional performance, factor exposure drift, RL reward trend
+QUARTERLY: Full walk-forward re-evaluation, feature importance refresh, model rebuild decision
+```
+
+**Degradation Response Protocol:**
+```
+Rolling 30d Sharpe < 0.8   →   Review regime detector, check for data issues
+Rolling 30d Sharpe < 0.5   →   Auto-pause; human review required
+Feature IC drops > 30%     →   Re-run variable assessment (Step 2)
+RL agent diverging         →   Roll back to Layer 2 only; retrain RL from scratch
+2 consecutive losing months →  Full system audit before resuming live trading
+```
+
+---
+
+## PERFORMANCE BENCHMARKS SUMMARY
+
+| Metric | Minimum Acceptable | Target |
+|---|---|---|
+| Annual Return (net) | 16% | 22–28% |
+| Sharpe Ratio | 1.0 | 1.5+ |
+| Sortino Ratio | 1.2 | 2.0+ |
+| Max Drawdown | < 20% | < 12% |
+| Win Rate | 52% | 57%+ |
+| Layer 1 IC | 0.05 | 0.10+ |
+| Directional Accuracy | 53% | 57%+ |
+| Benchmark Beta | < 0.7 | < 0.4 |
+
+---
+
+## TECHNOLOGY STACK RECOMMENDATION
+
+```
+Data:         yfinance / Polygon.io / Refinitiv; Arctic for time-series storage
+Feature Eng:  Pandas, TA-Lib, scikit-learn
+Layer 1:      PyTorch (LSTM/TFT), LightGBM, pytorch-forecasting
+Layer 2:      cvxpy (optimization), PyPortfolioOpt
+Layer 3:      Stable-Baselines3 (SAC), custom gym environment
+Backtesting:  Vectorbt or Backtrader (NOT Zipline — deprecated)
+Deployment:   FastAPI microservice; Docker; broker SDK (Alpaca / Interactive Brokers)
+Monitoring:   Grafana dashboard; PagerDuty alerts; MLflow for model versioning
+```
+
+---
+
+*Document Version: 1.0 | Architecture: 3-Layer ML Ensemble | Target ROI: >16% net*</p>
+        </div>
+        <button class="read-more-btn" onclick="toggle('body-2', this)" aria-expanded="false">
+          <span class="arrow">▶</span> read more
+        </button>
+      </article>
+
+      <article>
         <p class="entry-date">06/09/2026</p>
         <h2 class="entry-title">title3</h2>
         <div class="entry-tags">
